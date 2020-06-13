@@ -22,14 +22,15 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        sceneView.session.run(configuration)
+        reloadConfiguration()
+        //sceneView.session.run(configuration)
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         sceneView.session.pause()
     }
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { // detecting taps
         super.touchesBegan(touches, with: event)
         guard let node = selectedNode, let touch = touches.first else { return }
         switch objectMode {
@@ -42,7 +43,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         }
     }
     
-    func addNodeInFront(_ node: SCNNode){
+    func addNodeInFront(_ node: SCNNode){ // to add multiple copies of the node with multiple taps (20cm)
         guard let currentFrame = sceneView.session.currentFrame else {
             return
         }
@@ -51,8 +52,53 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         translation.columns.3.z = -0.2
         node.simdTransform = matrix_multiply(currentFrame.camera.transform, translation)
         
+        addNodeToSceneRoot(node)
+    }
+     var placedNode = [SCNNode]()
+     var planesNode = [SCNNode]()
+    
+    func addNodeToSceneRoot(_ node: SCNNode)// the node that i create needs to be cloned and added to the scene
+    {
         let cloneNode = node.clone()
         sceneView.scene.rootNode.addChildNode(cloneNode)
+        placedNode.append(cloneNode)
+    }
+    
+    func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) { //added as children od the node not as children of the root node
+        if let imageAnchor = anchor as? ARImageAnchor{
+        nodeAdded(node, for: imageAnchor)
+        } else if let planeAnchor = anchor as? ARPlaneAnchor{
+        nodeAdded(node, for: planeAnchor)
+        }
+    }
+    
+    func nodeAdded(_ node: SCNNode, for anchor :ARPlaneAnchor){
+        
+    }
+    
+    func nodeAdded(_ node: SCNNode, for anchor: ARImageAnchor){
+        if let selectedNode = selectedNode{
+            addNode(selectedNode, toImageUsingParentNode: node)
+            
+        }
+        
+    }
+    func addNode(_ node: SCNNode, toImageUsingParentNode parentNode: SCNNode){
+        let cloneNode = node.clone()
+        parentNode.addChildNode(cloneNode)
+        placedNode.append(cloneNode)
+    }
+    
+    var objetMode: ObjectPlacementMode = .freeform{
+        didSet {
+        reloadConfiguration()
+        }
+    }
+    
+    func reloadConfiguration(){ // update the session configuration's detentionImage
+        configuration.detectionImages = (objectMode == .image) ? ARReferenceImage.referenceImages(inGroupNamed: "AR Resources", bundle: nil) : nil
+        // if the app is in one of the other two modes, dectionImage should be nil
+        sceneView.session.run(configuration)
     }
 
     @IBAction func changeObjectMode(_ sender: UISegmentedControl) { // update objectMode to the proper value
