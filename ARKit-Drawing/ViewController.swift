@@ -55,7 +55,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         addNodeToSceneRoot(node)
     }
      var placedNode = [SCNNode]()
-     var planesNode = [SCNNode]()
+     var planeNodes = [SCNNode]()
     
     func addNodeToSceneRoot(_ node: SCNNode)// the node that i create needs to be cloned and added to the scene
     {
@@ -65,21 +65,37 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     }
     
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) { //added as children od the node not as children of the root node
-        if let imageAnchor = anchor as? ARImageAnchor{
+       /* if let imageAnchor = anchor as? ARImageAnchor{
         nodeAdded(node, for: imageAnchor)
         } else if let planeAnchor = anchor as? ARPlaneAnchor{
         nodeAdded(node, for: planeAnchor)
+        }*/
+        guard let planeAnchor = anchor as? ARPlaneAnchor, let planeNode = node.childNodes.first, let plane = planeNode.geometry as? SCNPlane
+        else { return }
+        planeNode.position = SCNVector3(planeAnchor.extent.x, 0, planeAnchor.extent.z)
+        plane.width = CGFloat(planeAnchor.extent.x)
+        plane.height = CGFloat(planeAnchor.extent.z)
+    }
+    
+    var showPlaneOverlay = false {
+        didSet{
+        for node in planeNodes {
+        node.isHidden = !showPlaneOverlay
+        }
         }
     }
     
     func nodeAdded(_ node: SCNNode, for anchor :ARPlaneAnchor){
+        let floor = createFloor(planeAnchor: anchor)
+        floor.isHidden = !showPlaneOverlay
+        node.addChildNode(floor)
+        planeNodes.append(floor)
         
     }
     
     func nodeAdded(_ node: SCNNode, for anchor: ARImageAnchor){
-        if let selectedNode = selectedNode{
-            addNode(selectedNode, toImageUsingParentNode: node)
-            
+       if let selectedNode = selectedNode{
+        addNode(selectedNode, toImageUsingParentNode: node)
         }
         
     }
@@ -89,6 +105,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         placedNode.append(cloneNode)
     }
     
+    
     var objetMode: ObjectPlacementMode = .freeform{
         didSet {
         reloadConfiguration()
@@ -96,10 +113,21 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     }
     
     func reloadConfiguration(){ // update the session configuration's detentionImage
+        configuration.planeDetection = .horizontal
         configuration.detectionImages = (objectMode == .image) ? ARReferenceImage.referenceImages(inGroupNamed: "AR Resources", bundle: nil) : nil
         // if the app is in one of the other two modes, dectionImage should be nil
         sceneView.session.run(configuration)
     }
+    
+    func createFloor(planeAnchor : ARPlaneAnchor) -> SCNNode{
+        let node = SCNNode()
+        let geometry = SCNPlane(width: CGFloat(planeAnchor.extent.x), height: CGFloat(planeAnchor.extent.z))
+        node.geometry = geometry
+        node.eulerAngles.x = -Float.pi/2
+        node.opacity = 0.25
+        return node
+    }
+    
 
     @IBAction func changeObjectMode(_ sender: UISegmentedControl) { // update objectMode to the proper value
         switch sender.selectedSegmentIndex {
@@ -133,6 +161,7 @@ extension ViewController: OptionsViewControllerDelegate {
     
     func togglePlaneVisualization() { //is called when th user taps Enable/Disable plane
         dismiss(animated: true, completion: nil)
+        showPlaneOverlay = !showPlaneOverlay
     }
     
     func undoLastObject() { // is called when the user taps Undo Last object
