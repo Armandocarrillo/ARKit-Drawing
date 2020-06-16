@@ -82,6 +82,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         placedNode.append(cloneNode)
     }
     
+    
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) { //added as children od the node not as children of the root node
        /* if let imageAnchor = anchor as? ARImageAnchor{
         nodeAdded(node, for: imageAnchor)
@@ -140,15 +141,29 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     
     var objetMode: ObjectPlacementMode = .freeform{
         didSet {
-        reloadConfiguration()
+        reloadConfiguration(removeAnchors: false)
         }
     }
     
-    func reloadConfiguration(){ // update the session configuration's detentionImage
-        configuration.planeDetection = .horizontal
+    func reloadConfiguration(removeAnchors: Bool = true){ // update the session configuration's detentionImage
+        configuration.planeDetection = [.horizontal,.vertical]
         configuration.detectionImages = (objectMode == .image) ? ARReferenceImage.referenceImages(inGroupNamed: "AR Resources", bundle: nil) : nil
         // if the app is in one of the other two modes, dectionImage should be nil
-        sceneView.session.run(configuration)
+        let options : ARSession.RunOptions
+        if removeAnchors {
+            options = [.removeExistingAnchors]
+            for node in planeNodes {
+                node.removeFromParentNode()
+            }
+            planeNodes.removeAll()
+            for node in placedNode{
+                node.removeFromParentNode()
+            }
+            placedNode.removeAll()
+        }else{
+            options = []
+        }
+        sceneView.session.run(configuration, options: options)
     }
     
     func createFloor(planeAnchor : ARPlaneAnchor) -> SCNNode{
@@ -197,11 +212,17 @@ extension ViewController: OptionsViewControllerDelegate {
     }
     
     func undoLastObject() { // is called when the user taps Undo Last object
-        
-    }
+    //to remove last object
+    if let lastNode = placedNode.last{
+        lastNode.removeFromParentNode()
+        placedNode.removeLast()
+            }
+        }
+    
     
     func resetScene() { // is called when the user taps reset scene
         dismiss(animated: true, completion: nil)
+        reloadConfiguration()
     }
     
     
